@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Homebrew Character Sheet</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #e2e8f0; } /* slate-200 */
+        .placeholder-section { border: 2px dashed #cbd5e1; padding: 1rem; min-height: 80px; display: flex; align-items: center; justify-content: center; color: #64748b; font-style: italic; border-radius: 0.375rem; }
+        .hidden { display: none; }
+        /* Admin Panel Table Styles */
+        #admin-panel-modal table { width: 100%; border-collapse: collapse; }
+        #admin-panel-modal th, #admin-panel-modal td { border: 1px solid #e2e8f0; padding: 8px 12px; text-align: left; }
+        #admin-panel-modal th { background-color: #f8fafc; }
+        #admin-panel-modal tr:nth-child(even) { background-color: #fdfdfe; }
+        #admin-panel-modal button { cursor: pointer; }
+        /* Simple grid for saves/skills */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 0.25rem 1rem; }
+        .skill-list { columns: 2; -webkit-columns: 2; -moz-columns: 2; column-gap: 1.5rem; font-size: 0.875rem; }
+        .skill-list p { margin-bottom: 0.25rem; break-inside: avoid-column; -webkit-column-break-inside: avoid; page-break-inside: avoid;} /* Prevent skills breaking mid-item */
+        /* Style for character list items */
+        .character-list-item { display: block; padding: 0.75rem 1rem; margin-bottom: 0.5rem; background-color: #fff; border: 1px solid #e2e8f0; border-radius: 0.375rem; cursor: pointer; transition: background-color 0.2s ease; text-align: center; }
+        .character-list-item:hover { background-color: #f8fafc; }
+    </style>
+</head>
+<body class="font-sans antialiased text-gray-800">
+
+    <div class="container mx-auto max-w-5xl p-4 my-8">
+
+        <div id="loading" class="text-center p-10">
+            <p class="text-xl text-gray-600">Loading...</p>
+        </div>
+
+        <div id="auth-container" class="hidden bg-white p-8 rounded-lg shadow-lg max-w-md mx-auto text-center">
+             <h1 class="text-2xl font-bold mb-6">Sign In</h1>
+            <p class="text-gray-600 mb-6">Please sign in with your Google account to access your character sheet.</p>
+            <button id="google-signin-button" class="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <svg class="h-6 w-6 mr-2" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                Sign in with Google
+            </button>
+            <p id="auth-error" class="text-red-500 text-sm mt-4"></p>
+        </div>
+
+        <div id="character-selection-screen" class="hidden bg-white p-8 rounded-lg shadow-lg max-w-lg mx-auto">
+             <div class="flex justify-between items-center mb-4">
+                 <h1 class="text-2xl font-bold">Select Character</h1>
+                 <button id="selection-logout-button" class="px-3 py-1 bg-red-500 text-white text-xs font-medium rounded shadow hover:bg-red-600">Logout</button>
+            </div>
+             <p class="text-gray-600 mb-6">Choose a character to load or create a new one.</p>
+             <div id="character-list" class="mb-6 min-h-[100px] max-h-[40vh] overflow-y-auto border rounded p-2 bg-gray-50">
+                 <p class="text-gray-500 italic text-center py-4">Loading characters...</p>
+                 </div>
+             <button id="show-creation-form-button" class="w-full px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                + Create New Character
+             </button>
+              <p id="selection-error" class="text-red-500 text-sm mt-4"></p>
+        </div>
+        <div id="main-content" class="hidden bg-white p-6 rounded-lg shadow-lg relative">
+            <div class="flex justify-between items-center mb-4 pb-4 border-b">
+                <button id="switch-character-button" class="px-3 py-1 bg-gray-500 text-white text-xs font-medium rounded shadow hover:bg-gray-600 mr-auto">Switch Character</button>
+                <div class="ml-4 flex items-center space-x-4">
+                    <span class="text-sm hidden sm:inline">Logged in as: <span id="user-email" class="font-semibold"></span></span>
+                    <button id="open-admin-panel-button" class="hidden px-3 py-1 bg-purple-600 text-white text-xs font-medium rounded shadow hover:bg-purple-700">Admin Panel</button>
+                    <button id="main-logout-button" class="px-3 py-1 bg-red-500 text-white text-xs font-medium rounded shadow hover:bg-red-600">Logout</button>
+                </div>
+            </div>
+
+            <section id="character-creation" class="mb-6 p-4 border border-blue-200 rounded-md bg-blue-50 hidden">
+                 <h2 class="text-xl font-semibold text-gray-800 mb-4">Create New Character</h2>
+                 <div class="mb-4"><label for="char-name" class="block text-sm font-medium text-gray-700 mb-1">Character Name:</label><input type="text" id="char-name" placeholder="Enter character name..." class="w-full p-2 border border-gray-300 rounded-md shadow-sm"></div>
+
+                 <div class="mb-4">
+                     <h3 class="text-lg font-medium text-gray-700 mb-2">Base Stats:</h3>
+                     <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3 mb-4">
+                         <div><label for="stat-str" class="block text-sm font-medium text-gray-700 mb-1">STR:</label><input type="text" inputmode="numeric" id="stat-str" value="10" class="w-full p-2 border border-gray-300 rounded-md shadow-sm text-sm"></div>
+                         <div><label for="stat-dex" class="block text-sm font-medium text-gray-700 mb-1">DEX:</label><input type="text" inputmode="numeric" id="stat-dex" value="10" class="w-full p-2 border border-gray-300 rounded-md shadow-sm text-sm"></div>
+                         <div><label for="stat-con" class="block text-sm font-medium text-gray-700 mb-1">CON:</label><input type="text" inputmode="numeric" id="stat-con" value="10" class="w-full p-2 border border-gray-300 rounded-md shadow-sm text-sm"></div>
+                         <div><label for="stat-int" class="block text-sm font-medium text-gray-700 mb-1">INT:</label><input type="text" inputmode="numeric" id="stat-int" value="10" class="w-full p-2 border border-gray-300 rounded-md shadow-sm text-sm"></div>
+                         <div><label for="stat-wis" class="block text-sm font-medium text-gray-700 mb-1">WIS:</label><input type="text" inputmode="numeric" id="stat-wis" value="10" class="w-full p-2 border border-gray-300 rounded-md shadow-sm text-sm"></div>
+                         <div><label for="stat-cha" class="block text-sm font-medium text-gray-700 mb-1">CHA:</label><input type="text" inputmode="numeric" id="stat-cha" value="10" class="w-full p-2 border border-gray-300 rounded-md shadow-sm text-sm"></div>
+                     </div>
+                     <div class="border-t pt-3">
+                        <h4 class="text-md font-medium text-gray-600 mb-2">Custom & Core Stats:</h4>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
+                            <div><label for="stat-vigor" class="block text-sm font-medium text-gray-700 mb-1">Vigor:</label><input type="text" inputmode="numeric" id="stat-vigor" value="10" class="w-full p-2 border border-gray-300 rounded-md shadow-sm text-sm"></div>
+                            <div><label for="stat-agility" class="block text-sm font-medium text-gray-700 mb-1">Agility:</label><input type="text" inputmode="numeric" id="stat-agility" value="10" class="w-full p-2 border border-gray-300 rounded-md shadow-sm text-sm"></div>
+                            <div><label for="stat-mind" class="block text-sm font-medium text-gray-700 mb-1">Mind:</label><input type="text" inputmode="numeric" id="stat-mind" value="10" class="w-full p-2 border border-gray-300 rounded-md shadow-sm text-sm"></div>
+                            <div><label for="stat-spirit" class="block text-sm font-medium text-gray-700 mb-1">Spirit:</label><input type="text" inputmode="numeric" id="stat-spirit" value="10" class="w-full p-2 border border-gray-300 rounded-md shadow-sm text-sm"></div>
+                            <div><label for="stat-soul-level" class="block text-sm font-medium text-gray-700 mb-1">Soul Lvl:</label><input type="text" inputmode="numeric" id="stat-soul-level" value="0" min="0" class="w-full p-2 border border-gray-300 rounded-md shadow-sm text-sm"></div>
+                            <div><label for="stat-prestige-level" class="block text-sm font-medium text-gray-700 mb-1">Prestige Lvl:</label><input type="text" inputmode="numeric" id="stat-prestige-level" value="0" min="0" class="w-full p-2 border border-gray-300 rounded-md shadow-sm text-sm"></div>
+                        </div>
+                     </div>
+                 </div>
+
+                 <div class="mb-4"><h3 class="text-lg font-medium text-gray-700 mb-2">Select Initial DNA(s):</h3><div id="dna-selection-options" class="p-4 border border-gray-300 rounded-md bg-gray-50 min-h-[80px]"><p class="text-gray-500 italic text-sm">Loading...</p></div></div>
+                 <div class="text-right mt-4"><button id="save-character" class="px-6 py-2 bg-green-600 text-white font-semibold rounded-md shadow hover:bg-green-700">Save Character</button><p id="create-error" class="text-red-500 text-sm mt-2 text-left"></p></div>
+            </section>
+
+            <section id="character-display" class="hidden">
+                <h1 id="display-char-name" class="text-3xl font-bold text-center mb-6"></h1>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="md:col-span-1 space-y-4">
+                         <div class="bg-gray-100 p-4 rounded-lg shadow"> <h3 class="font-semibold mb-2 border-b pb-1">Combat</h3> <div class="grid grid-cols-3 gap-2 text-center text-sm"> <div><div class="font-medium text-gray-500 text-xs uppercase">AC</div><div class="text-lg font-bold" id="display-ac">--</div></div> <div><div class="font-medium text-gray-500 text-xs uppercase">Max HP</div><div class="text-lg font-bold" id="display-max-hp">--</div></div> <div><div class="font-medium text-gray-500 text-xs uppercase">Speed</div><div class="text-lg font-bold" id="display-speed">--</div></div> </div> <div class="mt-3 border-t pt-2 space-y-1"><p class="text-sm">Level: <span class="font-semibold" id="display-level">1</span></p><p class="text-sm">EXP: <span class="font-semibold" id="display-exp">0</span> / <span id="display-exp-needed">1000</span></p></div> </div>
+                         <div class="bg-gray-100 p-4 rounded-lg shadow"> <h3 class="font-semibold mb-2 border-b pb-1">Ability Scores</h3> <div id="display-stats" class="stats-grid text-sm"><p>STR: <span class="font-semibold" id="display-stat-str">--</span></p><p>INT: <span class="font-semibold" id="display-stat-int">--</span></p><p>DEX: <span class="font-semibold" id="display-stat-dex">--</span></p><p>WIS: <span class="font-semibold" id="display-stat-wis">--</span></p><p>CON: <span class="font-semibold" id="display-stat-con">--</span></p><p>CHA: <span class="font-semibold" id="display-stat-cha">--</span></p><div class="col-span-2 mt-2 border-t pt-2"></div> <p>Vigor: <span class="font-semibold" id="display-stat-vigor">--</span></p><p>Mind: <span class="font-semibold" id="display-stat-mind">--</span></p><p>Agility: <span class="font-semibold" id="display-stat-agility">--</span></p><p>Spirit: <span class="font-semibold" id="display-stat-spirit">--</span></p></div> </div>
+                         <div class="bg-gray-100 p-4 rounded-lg shadow"> <h3 class="font-semibold mb-2 border-b pb-1">Soul</h3> <div class="space-y-1"><p class="text-sm">Soul Lvl: <span class="font-semibold" id="display-soul-level">--</span></p><p class="text-sm">Soul HP: <span class="font-semibold" id="display-soul-hp">--</span></p><p class="text-sm">Soul Pow: <span class="font-semibold" id="display-soul-power">--</span></p></div> </div>
+                    </div>
+                    <div class="md:col-span-2 space-y-4">
+                         <div class="bg-gray-100 p-4 rounded-lg shadow"> <h3 class="font-semibold mb-2 border-b pb-1">Saving Throws</h3> <div id="display-saves" class="stats-grid text-sm"><p>STR: <span class="font-semibold" id="display-save-str">--</span></p><p>DEX: <span class="font-semibold" id="display-save-dex">--</span></p><p>CON: <span class="font-semibold" id="display-save-con">--</span></p><p>INT: <span class="font-semibold" id="display-save-int">--</span></p><p>WIS: <span class="font-semibold" id="display-save-wis">--</span></p><p>CHA: <span class="font-semibold" id="display-save-cha">--</span></p></div> </div>
+                         <div class="bg-gray-100 p-4 rounded-lg shadow"> <h3 class="font-semibold mb-2 border-b pb-1">Skills</h3> <div id="display-skills" class="skill-list"><p>Acrobatics <span class="font-semibold" id="display-skill-acrobatics">--</span></p><p>Animal Handling <span class="font-semibold" id="display-skill-animalhandling">--</span></p><p>Arcana <span class="font-semibold" id="display-skill-arcana">--</span></p><p>Athletics <span class="font-semibold" id="display-skill-athletics">--</span></p><p>Deception <span class="font-semibold" id="display-skill-deception">--</span></p><p>History <span class="font-semibold" id="display-skill-history">--</span></p><p>Insight <span class="font-semibold" id="display-skill-insight">--</span></p><p>Intimidation <span class="font-semibold" id="display-skill-intimidation">--</span></p><p>Investigation <span class="font-semibold" id="display-skill-investigation">--</span></p><p>Medicine <span class="font-semibold" id="display-skill-medicine">--</span></p><p>Nature <span class="font-semibold" id="display-skill-nature">--</span></p><p>Perception <span class="font-semibold" id="display-skill-perception">--</span></p><p>Performance <span class="font-semibold" id="display-skill-performance">--</span></p><p>Persuasion <span class="font-semibold" id="display-skill-persuasion">--</span></p><p>Religion <span class="font-semibold" id="display-skill-religion">--</span></p><p>Sleight of Hand <span class="font-semibold" id="display-skill-sleightofhand">--</span></p><p>Stealth <span class="font-semibold" id="display-skill-stealth">--</span></p><p>Survival <span class="font-semibold" id="display-skill-survival">--</span></p></div> </div>
+                         <div class="bg-gray-100 p-4 rounded-lg shadow"> <h3 class="font-semibold mb-2 border-b pb-1">DNAs</h3> <div id="display-dnas" class="text-sm space-y-1"></div> </div>
+                         <div class="placeholder-section">Powers Section Placeholder</div>
+                         <div class="placeholder-section">Weapons & Equipment Section Placeholder</div>
+                         <div class="placeholder-section">Notes Section Placeholder</div>
+                    </div>
+                </div>
+            </section>
+
+             <div id="admin-panel-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center p-4 z-50">
+                <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto relative">
+                    <button id="close-admin-panel-button" class="absolute top-2 right-3 text-gray-500 hover:text-gray-800 text-2xl font-bold">&times;</button>
+                    <h2 class="text-2xl font-semibold mb-4 border-b pb-2">Admin Panel</h2>
+                    <section id="admin-manage-dnas"> <h3 class="text-xl font-medium mb-4">Manage DNAs</h3> <div class="mb-6 border p-4 rounded bg-gray-50"><h4 class="text-lg font-medium mb-3">Add New DNA</h4><form id="admin-add-dna-form" class="space-y-3"><div><label for="admin-dna-name" class="block text-sm font-medium text-gray-700">Name:</label><input type="text" id="admin-dna-name" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></div><div><label for="admin-dna-description" class="block text-sm font-medium text-gray-700">Description:</label><textarea id="admin-dna-description" rows="2" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></textarea></div><button type="submit" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md shadow hover:bg-blue-700">Add DNA</button><p id="admin-add-dna-error" class="text-red-500 text-sm inline-block ml-4"></p></form></div> <div><h4 class="text-lg font-medium mb-3">Existing DNAs</h4><div id="admin-dna-list-loading" class="text-gray-500">Loading DNAs...</div><div id="admin-dna-list-container"><table id="admin-dna-table" class="hidden"><thead><tr><th>Name</th><th>Description</th><th>Actions</th></tr></thead><tbody id="admin-dna-table-body"></tbody></table><p id="admin-dna-list-error" class="text-red-500 text-sm mt-2"></p></div></div> </section>
+                </div>
+            </div>
+            </div> </div> <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore-compat.js"></script>
+    <script src="app.js"></script>
+
+</body>
+</html>
